@@ -16,7 +16,7 @@ io.on('connection', (socket)=>{
     rooms[roomId] = {closed:false, users:[], hostId:socket.id};
     socket.join(roomId);
     rooms[roomId].users.push(socket.id);
-    const link = `http://localhost:3000/chat/${roomId}`;
+    const link = `https://bds-bank-support.onrender.com/chat/${roomId}`;
     socket.emit('room-created', {roomId, link});
   });
   socket.on('join-room', ({roomId, isHost})=>{
@@ -42,4 +42,4 @@ io.on('connection', (socket)=>{
     }
   });
 });
-server.listen(3000, ()=> console.log('BDS BANK SUPPORT running at http://localhost:3000'));
+server.listen(process.env.PORT || 3000, () => console.log('BDS BANK SUPPORT running'))
