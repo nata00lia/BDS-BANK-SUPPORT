@@ -32,14 +32,15 @@ const input=document.getElementById('input');
 const typing=document.getElementById('typing');
 let isHost=false;
 
-function scrollDown(){
- setTimeout(()=>{
-   chat.scrollTop = chat.scrollHeight + 100;
- }, 100);
-}
+function scrollDown(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight + 150; }, 100); }
 
 socket.emit('join-room', roomId, location.search.includes('host'));
-socket.on('joined', h=>{isHost=h;document.getElementById('who').innerText=h?'You (Support)':'You (Client)';});
+
+socket.on('joined', h=>{
+  isHost=h;
+  document.getElementById('who').innerText=h?'You (Support)':'You (Client)';
+  if(!h) document.getElementById('endBtn').style.display='none';
+});
 
 function add(text,me){
  const div=document.createElement('div');
@@ -48,36 +49,50 @@ function add(text,me){
  div.innerHTML=`<div class="small">${name}</div>${text}`;
  chat.appendChild(div); scrollDown();
 }
+
 document.getElementById('send').onclick=()=>{
  const t=input.value.trim(); if(!t)return;
  add(t,true); socket.emit('send-message', roomId, t); input.value=''; scrollDown();
 };
 input.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('send').click();});
-
-// FIX KEYBOARD
-input.addEventListener('focus', ()=>{
-  scrollDown();
-  setTimeout(scrollDown, 300);
-});
+input.addEventListener('focus', ()=>{ scrollDown(); setTimeout(scrollDown,300); });
 input.addEventListener('input',()=>{socket.emit('typing', roomId); scrollDown();});
+if(window.visualViewport){ window.visualViewport.addEventListener('resize', ()=>{ scrollDown(); }); }
 
-if(window.visualViewport){
- window.visualViewport.addEventListener('resize', ()=>{
-   scrollDown();
- });
-}
+// HISTORY + CLOSED LOGIC
+socket.on('load-history', (msgs, active)=>{
+ msgs.forEach(m=>{ add(m.text,false); });
+ if(!active){
+   add('This chat is no more available, it is under review.', false);
+   input.disabled=true;
+   input.placeholder='Chat closed';
+ }
+});
 
 socket.on('receive-msg', msg=>{add(msg,false);});
+
 socket.on('show-typing',()=>{
  typing.style.display='block'; 
  typing.innerText=(isHost?'Client is typing...':'Support is typing...');
  scrollDown();
  clearTimeout(window.tt); window.tt=setTimeout(()=>typing.style.display='none',2500);
 });
-document.getElementById('endBtn').onclick=()=>{if(confirm('End chat?'))socket.emit('close-room', roomId);};
-socket.on('room-closed',()=>{alert('Chat ended'); location.href='/';});
-socket.on('auto-reply', msg=>{add(msg,false);});
 
+socket.on('room-closed-msg', ()=>{
+ add('This chat is no more available, it is under review.', false);
+ input.disabled=true;
+ input.placeholder='Chat closed';
+});
+
+socket.on('room-closed', ()=>{
+ add('This chat is no more available, it is under review.', false);
+ input.disabled=true;
+ input.placeholder='Chat closed';
+ if(!isHost) setTimeout(()=>{ alert('Chat ended by support - under review'); },600);
+});
+
+socket.on('auto-reply', msg=>{add(msg,false);});
+document.getElementById('endBtn').onclick=()=>{if(confirm('End chat?'))socket.emit('close-room', roomId);};
 window.addEventListener('load', scrollDown);
 </script>
 </body>

@@ -2,35 +2,56 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BDS BANK</title>
+<title>BDS BANK ADMIN</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:sans-serif;background:#111b21;color:white;height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px}
-.box{background:white;color:black;width:100%;max-width:380px;border-radius:12px;padding:22px;text-align:center}
-h2{color:#075e54;margin-bottom:8px}
-p{font-size:12px;color:#777;margin-bottom:16px}
-button{width:100%;background:#075e54;color:white;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:bold}
-#linkArea{display:none;margin-top:14px;background:#e7fce3;border:1px dashed #075e54;padding:10px;border-radius:8px;word-break:break-all;font-size:12px;text-align:left}
+*{margin:0;padding:0;box-sizing:border-box} body{font-family:sans-serif;background:#111b21;color:white;min-height:100dvh;padding:15px}
+.box{background:white;color:black;width:100%;max-width:420px;margin:0 auto;border-radius:12px;padding:18px}
+h2{color:#075e54;text-align:center} p{font-size:12px;color:#777;text-align:center;margin-bottom:12px}
+button{width:100%;background:#075e54;color:white;border:none;padding:13px;border-radius:8px;font-weight:bold;cursor:pointer}
+#linkArea{display:none;margin-top:12px;background:#e7fce3;border:1px dashed #075e54;padding:10px;border-radius:8px;word-break:break-all;font-size:12px}
+.item{background:#f5f5f5;border-radius:8px;padding:10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center}
+.item small{font-size:11px;color:#666}
+.item.open{background:#128c7e;padding:6px 12px;border-radius:5px;font-size:12px;width:auto}
+.ended{opacity:0.5}
 </style>
 </head>
 <body>
 <div class="box">
-<h2>BDS.BANK SUPPORT</h2>
-<p>Tap to create WhatsApp chat link for client</p>
+<h2>BDS.BANK ADMIN</h2>
+<p>Generate and manage client chats</p>
 <button id="createBtn">CREATE CHAT LINK</button>
-<div id="linkArea">
-<div id="linkText"></div>
-<button id="copyBtn" style="margin-top:10px;background:#25d366">COPY LINK</button>
-<button id="openBtn" style="margin-top:8px;background:#128c7e">OPEN CHAT</button>
-</div>
+<div id="linkArea"><div id="linkText"></div><button id="copyBtn" style="margin-top:8px;background:#25d366">COPY LINK</button><button id="openBtn" style="margin-top:6px;background:#128c7e">OPEN CHAT AS SUPPORT</button></div>
+<h3 style="margin-top:18px;font-size:14px;color:#075e54">Chat History</h3>
+<div id="history">Loading...</div>
 </div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket=io();let currentLink='';
+const socket=io(); let currentLink='', currentId='';
+const historyDiv=document.getElementById('history');
+function renderHistory(rooms){
+ historyDiv.innerHTML='';
+ const ids=Object.keys(rooms).reverse();
+ if(ids.length===0){ historyDiv.innerHTML='<small>No chats yet</small>'; return;}
+ ids.forEach(id=>{
+   const r=rooms[id];
+   const div=document.createElement('div');
+   div.className='item '+(r.active?'':'ended');
+   div.innerHTML=`<div><b>${id}</b><br><small>${r.created} • ${r.messages.length} msgs • ${r.active?'ACTIVE':'CLOSED'}</small></div><button class="open">${r.active?'OPEN':'VIEW'}</button>`;
+   div.querySelector('button').onclick=()=>{ window.open('/chat/'+id+'?host=true','_blank'); };
+   historyDiv.appendChild(div);
+ });
+}
+fetch('/history').then(r=>r.json()).then(renderHistory);
+socket.on('rooms-update', renderHistory);
 document.getElementById('createBtn').onclick=()=>{socket.emit('create-room');document.getElementById('createBtn').innerText='Creating...';};
-socket.on('room-created',data=>{currentLink=data.link;document.getElementById('linkArea').style.display='block';document.getElementById('linkText').innerText=currentLink;document.getElementById('createBtn').innerText='CREATE ANOTHER LINK';});
-document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(currentLink);alert('Copied!');};
-document.getElementById('openBtn').onclick=()=>{window.open(currentLink+'?host=true','_blank');};
+socket.on('room-created',data=>{
+ currentId=data.roomId; currentLink=data.link;
+ document.getElementById('linkArea').style.display='block';
+ document.getElementById('linkText').innerText=currentLink;
+ document.getElementById('createBtn').innerText='CREATE ANOTHER LINK';
+});
+document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(currentLink); alert('Copied!');};
+document.getElementById('openBtn').onclick=()=>{window.open('/chat/'+currentId+'?host=true','_blank');};
 </script>
 </body>
 </html>
