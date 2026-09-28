@@ -1,24 +1,36 @@
 <!DOCTYPE html>
 <html>
-<head><title>BDS.BANK SUPPORT</title></head>
-<body style="font-family:Arial;padding:20px;max-width:600px;margin:auto">
-<h1 style="color:#0a3d62;text-align:center">BDS.BANK SUPPORT</h1>
-<p style="text-align:center">Private Secure Chat Generator</p>
-<button id="create" style="width:100%;padding:15px;background:#0a3d62;color:white;border:none;cursor:pointer">Generate Private Chat Link</button>
-<p id="link" style="background:#eee;padding:10px;word-break:break-all;margin-top:15px"></p>
-<div id="box" style="border:1px solid #ccc;height:300px;overflow:auto;margin:10px 0;padding:10px"></div>
-<input id="input" style="width:70%;padding:10px" placeholder="Type reply...">
-<button id="send" style="padding:10px">Send</button><br><br>
-<button id="end" style="width:100%;background:red;color:white;padding:12px;border:none">END CHAT FOREVER</button>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDS BANK</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:sans-serif;background:#111b21;color:white;height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{background:white;color:black;width:100%;max-width:380px;border-radius:12px;padding:22px;text-align:center}
+h2{color:#075e54;margin-bottom:8px}
+p{font-size:12px;color:#777;margin-bottom:16px}
+button{width:100%;background:#075e54;color:white;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:bold}
+#linkArea{display:none;margin-top:14px;background:#e7fce3;border:1px dashed #075e54;padding:10px;border-radius:8px;word-break:break-all;font-size:12px;text-align:left}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>BDS.BANK SUPPORT</h2>
+<p>Tap to create WhatsApp chat link for client</p>
+<button id="createBtn">CREATE CHAT LINK</button>
+<div id="linkArea">
+<div id="linkText"></div>
+<button id="copyBtn" style="margin-top:10px;background:#25d366">COPY LINK</button>
+<button id="openBtn" style="margin-top:8px;background:#128c7e">OPEN CHAT</button>
+</div>
+</div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket=io();let roomId=null;
-create.onclick=()=>socket.emit('create-room');
-socket.on('room-created',d=>{roomId=d.roomId;link.innerText="COPY THIS LINK: "+d.link;socket.emit('join-room',{roomId,isHost:true})});
-send.onclick=()=>{if(!input.value)return;socket.emit('send-message',{roomId,message:"SUPPORT: "+input.value});input.value='';};
-socket.on('receive-message',m=>{box.innerHTML+=`<p>${m}</p>`;box.scrollTop=box.scrollHeight});
-end.onclick=()=>{if(confirm('End this chat forever? You will not get messages again.'))socket.emit('end-chat',roomId)};
-socket.on('chat-ended',()=>{box.innerHTML+="<p><i>You closed this chat.</i></p>"});
+const socket=io();let currentLink='';
+document.getElementById('createBtn').onclick=()=>{socket.emit('create-room');document.getElementById('createBtn').innerText='Creating...';};
+socket.on('room-created',data=>{currentLink=data.link;document.getElementById('linkArea').style.display='block';document.getElementById('linkText').innerText=currentLink;document.getElementById('createBtn').innerText='CREATE ANOTHER LINK';});
+document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(currentLink);alert('Copied!');};
+document.getElementById('openBtn').onclick=()=>{window.open(currentLink+'?host=true','_blank');};
 </script>
 </body>
 </html>
