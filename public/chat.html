@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>BDS.BANK SUPPORT - Live Chat</title></head>
+<body style="font-family:Arial;padding:20px;max-width:600px;margin:auto">
+<h1 style="color:#0a3d62;text-align:center">BDS.BANK SUPPORT</h1>
+<p style="text-align:center">You are chatting with Support</p>
+<div id="box" style="border:1px solid #ccc;height:400px;overflow:auto;padding:10px"></div>
+<div style="margin-top:10px">
+<input id="input" style="width:70%;padding:12px" placeholder="Type your message...">
+<button id="send" style="padding:12px;background:#0a3d62;color:white;border:none">Send</button>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io();const roomId=window.location.pathname.split('/').pop();
+socket.emit('join-room',{roomId,isHost:false});
+send.onclick=()=>{if(!input.value)return;socket.emit('send-message',{roomId,message:"CLIENT: "+input.value});input.value='';};
+socket.on('receive-message',m=>{box.innerHTML+=`<p>${m}</p>`;box.scrollTop=box.scrollHeight});
+socket.on('auto-reply',m=>{box.innerHTML+=`<p style="color:gray"><i>BOT: ${m}</i></p>`});
+socket.on('room-closed',()=>{box.innerHTML+=`<p style="color:gray"><i>BOT: No customer service available at the moment, please wait till we reach out to you.</i></p>`});
+socket.on('chat-ended',()=>{box.innerHTML+=`<p style="color:red"><i>Support has ended this chat session.</i></p>`;input.disabled=true;send.disabled=true;});
+socket.on('error-msg',e=>{alert(e);});
+</script>
+</body>
+</html>
