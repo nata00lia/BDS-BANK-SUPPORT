@@ -5,27 +5,26 @@
 <title>BDS BANK SUPPORT</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:sans-serif;background:#e5ddd5;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-.top{background:#075e54;color:white;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;position:fixed;top:0;left:0;right:0;height:56px;z-index:20}
-#chat{margin-top:56px;flex:1;overflow-y:auto;padding:10px 10px 90px 10px;background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:4px}
-.bubble{max-width:80%;padding:8px 12px;border-radius:8px;margin:2px 0;font-size:15px;line-height:1.4;box-shadow:0 1px 0.5px rgba(0,0,0,.13);word-wrap:break-word;position:relative;display:block;width:fit-content;clear:both}
+html,body{height:100%;height:100dvh;width:100%;overflow:hidden}
+body{font-family:sans-serif;background:#e5ddd5;display:flex;flex-direction:column}
+.top{background:#075e54;color:white;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;height:56px;flex-shrink:0;z-index:20}
+#chat{flex:1;overflow-y:auto;padding:10px 10px 110px 10px;background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');display:flex;flex-direction:column;gap:4px;-webkit-overflow-scrolling:touch}
+.bubble{max-width:80%;padding:8px 12px;border-radius:8px;margin:2px 0;font-size:15px;line-height:1.4;box-shadow:0 1px.5px rgba(0,0,0,.13);word-wrap:break-word;width:fit-content;display:block;clear:both;position:relative}
 .me{background:#dcf8c6;margin-left:auto;align-self:flex-end;border-top-right-radius:0}
 .other{background:white;margin-right:auto;align-self:flex-start;border-top-left-radius:0}
 .small{font-size:11px;font-weight:bold;color:#075e54;margin-bottom:3px}
-.tick{font-size:11px;float:right;margin-left:8px;margin-top:4px}
-.tick.seen{color:#34b7f1}
-.tick.delivered{color:#999}
+.tick{font-size:11px;float:right;margin-left:8px;margin-top:4px}.tick.seen{color:#34b7f1}.tick.delivered{color:#999}
 #typing{position:fixed;bottom:75px;left:15px;font-size:12px;background:white;padding:6px 12px;border-radius:16px;display:none;color:#075e54;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:10}
-.bottom{position:fixed;bottom:0;left:0;right:0;background:#f0f0f0;padding:8px 10px;display:flex;gap:8px;align-items:center;z-index:30}
+.bottom{position:fixed;bottom:0;left:0;right:0;background:#f0f0f0;padding:10px 10px 14px 10px;padding-bottom:calc(14px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;z-index:30;border-top:1px solid #ddd}
 .bottom input{flex:1;border:none;border-radius:22px;padding:12px 16px;font-size:16px;outline:none}
-.bottom button{background:#075e54;color:white;border:none;width:48px;height:48px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center}
+.bottom button{background:#075e54;color:white;border:none;width:48px;height:48px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 </style>
 </head>
 <body>
 <div class="top"><div><b>BDS.BANK</b> SUPPORT<div id="who" style="font-size:11px;opacity:0.9"></div></div><button id="endBtn" style="background:#c0392b;color:white;border:none;padding:6px 12px;border-radius:5px;font-size:11px">END</button></div>
 <div id="chat"></div>
 <div id="typing">typing...</div>
-<div class="bottom"><input id="input" placeholder="Type a message"/><button id="send">➤</button></div>
+<div class="bottom"><input id="input" placeholder="Type a message" autocomplete="off"/><button id="send">➤</button></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket=io();
@@ -34,105 +33,46 @@ const chat=document.getElementById('chat');
 const input=document.getElementById('input');
 const typing=document.getElementById('typing');
 let isHost=location.search.includes('host');
-let myRole = isHost? 'support' : 'client';
-let currentAgent = localStorage.getItem('bds_agent_'+roomId) || null;
-
-function scrollDown(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight + 200; }, 100); }
-
+let myRole=isHost?'support':'client';
+let currentAgent=localStorage.getItem('bds_agent_'+roomId)||null;
+function scrollDown(){ setTimeout(()=>{ chat.scrollTop=chat.scrollHeight+200; },100); }
 socket.emit('join-room', roomId, isHost);
-
-socket.on('joined', h=>{
-  isHost=h;
-  myRole = h? 'support' : 'client';
-  document.getElementById('who').innerText = h? `You as ${currentAgent||'Support'}` : 'You (Client)';
-  if(!h) document.getElementById('endBtn').style.display='none';
-});
-
+socket.on('joined', h=>{ isHost=h; myRole=h?'support':'client'; document.getElementById('who').innerText=h?`You as ${currentAgent||'Support'}`:'You (Client)'; if(!h) document.getElementById('endBtn').style.display='none'; });
 function addMessageObj(m){
-  const isMine = m.sender === myRole;
-  const div=document.createElement('div');
-  div.className='bubble '+(isMine?'me':'other');
-  let senderName = isMine? 'You' : (m.sender==='support'? (m.agent||'Support') : 'Client');
-  let tickHtml = '';
-  if(isMine){
-    if(m.seen) tickHtml = `<span class="tick seen">✓✓ Seen</span>`;
-    else tickHtml = `<span class="tick delivered">✓✓</span>`;
-  }
+  const isMine=m.sender===myRole;
+  const div=document.createElement('div'); div.className='bubble '+(isMine?'me':'other');
+  let senderName=isMine?'You':(m.sender==='support'?(m.agent||'Support'):'Client');
+  let tickHtml=isMine?(m.seen?`<span class="tick seen">✓✓ Seen</span>`:`<span class="tick delivered">✓✓</span>`):'';
   div.innerHTML=`<div class="small">${senderName}</div>${m.text}${tickHtml}<div style="clear:both"></div>`;
-  chat.appendChild(div);
-  scrollDown();
+  chat.appendChild(div); scrollDown();
 }
-
-function renderAll(msgs){
-  chat.innerHTML='';
-  msgs.forEach(m=> addMessageObj(m));
+function renderAll(msgs){ chat.innerHTML=''; msgs.forEach(m=>addMessageObj(m)); }
+document.getElementById('send').onclick=()=>{ const t=input.value.trim(); if(!t) return; input.value=''; input.focus(); socket.emit('send-message', roomId, {text:t, sender:myRole, agent:currentAgent}); scrollDown(); };
+input.addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('send').click(); });
+input.addEventListener('focus', ()=>{ setTimeout(scrollDown,300); });
+input.addEventListener('input', ()=>{ socket.emit('typing', roomId); });
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', ()=>{ scrollDown(); });
 }
-
-document.getElementById('send').onclick=()=>{
- const t=input.value.trim(); if(!t) return;
- input.value='';
- const msgToSend = { text: t, sender: myRole, agent: currentAgent };
- socket.emit('send-message', roomId, msgToSend);
-};
-
-input.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('send').click();});
-input.addEventListener('input',()=>{socket.emit('typing', roomId);});
-if(window.visualViewport){ window.visualViewport.addEventListener('resize', ()=>{ scrollDown(); }); }
-
 socket.on('load-history', (msgs, active, agent)=>{
-  if(agent) currentAgent = agent;
+  if(agent) currentAgent=agent;
   if(isHost && currentAgent) document.getElementById('who').innerText=`You as ${currentAgent}`;
   renderAll(msgs);
-  if(!active){
-    const div=document.createElement('div');
-    div.className='bubble other';
-    div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
-    chat.appendChild(div);
-    input.disabled=true;
-    input.placeholder='Chat closed';
+  if(!active){ const d=document.createElement('div'); d.className='bubble other'; d.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.'; chat.appendChild(d); input.disabled=true; }
+  if(isHost &&!agent && msgs.length<=1){
+    const saved=localStorage.getItem('bds_agent_'+roomId);
+    if(saved){ currentAgent=saved; document.getElementById('who').innerText=`You as ${currentAgent}`; socket.emit('set-agent',{roomId, agent:currentAgent}); }
   }
-  // ONLY send Keith intro if chat is empty
-  if(isHost &&!agent && msgs.length===0){
-    const savedAgent = localStorage.getItem('bds_agent_'+roomId);
-    if(savedAgent){
-      currentAgent = savedAgent;
-      document.getElementById('who').innerText=`You as ${currentAgent}`;
-      socket.emit('set-agent', {roomId, agent: currentAgent});
-    }
-  }
-  socket.emit('message-seen', {roomId, viewer: myRole});
+  socket.emit('message-seen',{roomId, viewer:myRole});
+  setTimeout(scrollDown,300);
 });
-
-socket.on('receive-msg', msg=>{
-  addMessageObj(msg);
-  socket.emit('message-seen', {roomId, viewer: myRole});
-});
-
-socket.on('messages-seen-update', (msgs)=>{
-  // update all ticks to Seen
-  renderAll(msgs);
-});
-
-socket.on('show-typing',()=>{
- typing.style.display='block';
- typing.innerText=(isHost?'Client is typing...':'Support is typing...');
- clearTimeout(window.tt); window.tt=setTimeout(()=>typing.style.display='none',2000);
-});
-
-socket.on('room-closed-msg', ()=>{
- const div=document.createElement('div'); div.className='bubble other';
- div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
- chat.appendChild(div); input.disabled=true;
-});
-
-socket.on('room-closed', ()=>{
- const div=document.createElement('div'); div.className='bubble other';
- div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
- chat.appendChild(div); input.disabled=true;
- if(!isHost) setTimeout(()=>alert('Chat ended by support'),600);
-});
-
-document.getElementById('endBtn').onclick=()=>{if(confirm('End chat?'))socket.emit('close-room', roomId);};
+socket.on('receive-msg', msg=>{ addMessageObj(msg); socket.emit('message-seen',{roomId, viewer:myRole}); });
+socket.on('messages-seen-update', msgs=>{ renderAll(msgs); });
+socket.on('show-typing',()=>{ typing.style.display='block'; typing.innerText=isHost?'Client is typing...':'Support is typing...'; clearTimeout(window.tt); window.tt=setTimeout(()=>typing.style.display='none',2000); scrollDown(); });
+socket.on('room-closed-msg', ()=>{ const d=document.createElement('div'); d.className='bubble other'; d.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.'; chat.appendChild(d); input.disabled=true; });
+socket.on('room-closed', ()=>{ const d=document.createElement('div'); d.className='bubble other'; d.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.'; chat.appendChild(d); input.disabled=true; if(!isHost) setTimeout(()=>alert('Chat ended by support'),600); });
+document.getElementById('endBtn').onclick=()=>{ if(confirm('End chat?')) socket.emit('close-room', roomId); };
+window.addEventListener('load', scrollDown);
 </script>
 </body>
 </html>

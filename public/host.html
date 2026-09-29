@@ -22,56 +22,32 @@ select{width:100%;padding:12px;border-radius:8px;border:1px solid #ccc;margin-bo
 <p>Generate and manage client chats</p>
 <label style="font-size:12px;font-weight:bold;color:#075e54">SELECT AGENT TO CHAT AS:</label>
 <select id="agentSelect">
-  <option value="">-- Choose Agent --</option>
-  <option value="Keith">Keith</option>
-  <option value="Jason">Jason</option>
-  <option value="Harley">Harley</option>
-  <option value="Sam">Sam</option>
+<option value="">-- Choose Agent --</option>
+<option value="Keith">Keith</option>
+<option value="Jason">Jason</option>
+<option value="Harley">Harley</option>
+<option value="Sam">Sam</option>
 </select>
 <button id="createBtn">CREATE CHAT LINK</button>
 <div id="linkArea">
-  <div id="linkText"></div>
-  <button id="copyBtn" style="margin-top:8px;background:#25d366">COPY LINK</button>
-  <button id="openBtn" style="margin-top:6px;background:#128c7e">OPEN CHAT AS SUPPORT</button>
-  <small style="display:block;margin-top:6px;color:#075e54">Agent <b id="chosenAgent">Not selected</b> will join</small>
+<div id="linkText"></div>
+<button id="copyBtn" style="margin-top:8px;background:#25d366">COPY LINK</button>
+<button id="openBtn" style="margin-top:6px;background:#128c7e">OPEN CHAT AS SUPPORT</button>
+<small style="display:block;margin-top:6px;color:#075e54">Agent <b id="chosenAgent">Not selected</b> will join</small>
 </div>
 <h3 style="margin-top:18px;font-size:14px;color:#075e54">Chat History</h3>
 <div id="history">Loading...</div>
 </div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket=io();
-let currentLink='', currentId='';
-const historyDiv=document.getElementById('history');
-const agentSelect=document.getElementById('agentSelect');
-const chosenAgentSpan=document.getElementById('chosenAgent');
-agentSelect.onchange=()=>{ chosenAgentSpan.innerText = agentSelect.value || 'Not selected'; if(currentId) localStorage.setItem('bds_agent_'+currentId, agentSelect.value); };
-function renderHistory(rooms){
- historyDiv.innerHTML='';
- const ids=Object.keys(rooms).reverse();
- if(ids.length===0){ historyDiv.innerHTML='<small>No chats yet</small>'; return;}
- ids.forEach(id=>{
-   const r=rooms[id];
-   const div=document.createElement('div');
-   div.className='item '+(r.active?'':'ended');
-   div.innerHTML=`<div><b>${id}</b><br><small>${r.created} • ${r.messages.length} msgs • ${r.agent?r.agent+' • ':''}${r.active?'ACTIVE':'CLOSED'}</small></div><button class="open">${r.active?'OPEN':'VIEW'}</button>`;
-   div.querySelector('button').onclick=()=>{ if(!agentSelect.value) return alert('Select Agent First - Keith, Jason, Harley or Sam'); localStorage.setItem('bds_agent_'+id, agentSelect.value); window.open('/chat/'+id+'?host=true','_blank'); };
-   historyDiv.appendChild(div);
- });
-}
-fetch('/history').then(r=>r.json()).then(renderHistory);
-socket.on('rooms-update', renderHistory);
-document.getElementById('createBtn').onclick=()=>{ if(!agentSelect.value) return alert('Please select Agent first'); socket.emit('create-room'); document.getElementById('createBtn').innerText='Creating...'; };
-socket.on('room-created',data=>{
- currentId=data.roomId; currentLink=data.link;
- localStorage.setItem('bds_agent_'+currentId, agentSelect.value);
- document.getElementById('linkArea').style.display='block';
- document.getElementById('linkText').innerText=currentLink;
- chosenAgentSpan.innerText=agentSelect.value;
- document.getElementById('createBtn').innerText='CREATE ANOTHER LINK';
-});
-document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(currentLink); alert('Copied!');};
-document.getElementById('openBtn').onclick=()=>{ if(!agentSelect.value) return alert('Select Agent First'); window.open('/chat/'+currentId+'?host=true','_blank'); };
+const socket=io();let currentLink='',currentId='';const historyDiv=document.getElementById('history');const agentSelect=document.getElementById('agentSelect');const chosenAgentSpan=document.getElementById('chosenAgent');
+agentSelect.onchange=()=>{chosenAgentSpan.innerText=agentSelect.value||'Not selected';if(currentId)localStorage.setItem('bds_agent_'+currentId,agentSelect.value);};
+function renderHistory(rooms){historyDiv.innerHTML='';const ids=Object.keys(rooms).reverse();if(ids.length===0){historyDiv.innerHTML='<small>No chats yet</small>';return;}ids.forEach(id=>{const r=rooms[id];const div=document.createElement('div');div.className='item '+(r.active?'':'ended');div.innerHTML=`<div><b>${id}</b><br><small>${r.created} • ${r.messages.length} msgs • ${r.agent?r.agent+' • ':''}${r.active?'ACTIVE':'CLOSED'}</small></div><button class="open">${r.active?'OPEN':'VIEW'}</button>`;div.querySelector('button').onclick=()=>{if(!agentSelect.value)return alert('Select Agent First');localStorage.setItem('bds_agent_'+id,agentSelect.value);window.open('/chat/'+id+'?host=true','_blank');};historyDiv.appendChild(div);});}
+fetch('/history').then(r=>r.json()).then(renderHistory);socket.on('rooms-update',renderHistory);
+document.getElementById('createBtn').onclick=()=>{if(!agentSelect.value)return alert('Please select Agent first');socket.emit('create-room');document.getElementById('createBtn').innerText='Creating...';};
+socket.on('room-created',data=>{currentId=data.roomId;currentLink=data.link;localStorage.setItem('bds_agent_'+currentId,agentSelect.value);document.getElementById('linkArea').style.display='block';document.getElementById('linkText').innerText=currentLink;chosenAgentSpan.innerText=agentSelect.value;document.getElementById('createBtn').innerText='CREATE ANOTHER LINK';});
+document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(currentLink);alert('Copied!');};
+document.getElementById('openBtn').onclick=()=>{if(!agentSelect.value)return alert('Select Agent First');window.open('/chat/'+currentId+'?host=true','_blank');};
 </script>
 </body>
 </html>
