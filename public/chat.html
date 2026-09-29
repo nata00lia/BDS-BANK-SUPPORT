@@ -7,14 +7,14 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:sans-serif;background:#e5ddd5;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 .top{background:#075e54;color:white;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;position:fixed;top:0;left:0;right:0;height:56px;z-index:20}
-#chat{margin-top:56px;flex:1;overflow-y:auto;padding:10px 10px 90px 10px;background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');-webkit-overflow-scrolling:touch}
-.bubble{max-width:80%;padding:8px 12px;border-radius:8px;margin:6px 0;font-size:15px;line-height:1.4;box-shadow:0 1px.5px rgba(0,0,0,.13);word-wrap:break-word;position:relative}
-.me{background:#dcf8c6;margin-left:auto;border-top-right-radius:0}
-.other{background:white;margin-right:auto;border-top-left-radius:0}
+#chat{margin-top:56px;flex:1;overflow-y:auto;padding:10px 10px 90px 10px;background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:4px}
+.bubble{max-width:80%;padding:8px 12px;border-radius:8px;margin:2px 0;font-size:15px;line-height:1.4;box-shadow:0 1px 0.5px rgba(0,0,0,.13);word-wrap:break-word;position:relative;display:block;width:fit-content;clear:both}
+.me{background:#dcf8c6;margin-left:auto;align-self:flex-end;border-top-right-radius:0}
+.other{background:white;margin-right:auto;align-self:flex-start;border-top-left-radius:0}
 .small{font-size:11px;font-weight:bold;color:#075e54;margin-bottom:3px}
-.tick{font-size:11px;color:#53bdeb;float:right;margin-left:8px;margin-top:4px}
-.tick.seen{color:#0b8bff}
-.tick.delivered{color:#667781}
+.tick{font-size:11px;float:right;margin-left:8px;margin-top:4px}
+.tick.seen{color:#34b7f1}
+.tick.delivered{color:#999}
 #typing{position:fixed;bottom:75px;left:15px;font-size:12px;background:white;padding:6px 12px;border-radius:16px;display:none;color:#075e54;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:10}
 .bottom{position:fixed;bottom:0;left:0;right:0;background:#f0f0f0;padding:8px 10px;display:flex;gap:8px;align-items:center;z-index:30}
 .bottom input{flex:1;border:none;border-radius:22px;padding:12px 16px;font-size:16px;outline:none}
@@ -35,29 +35,23 @@ const input=document.getElementById('input');
 const typing=document.getElementById('typing');
 let isHost=location.search.includes('host');
 let myRole = isHost? 'support' : 'client';
-let currentAgent = null;
-let allMessages = [];
-function scrollDown(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight + 150; }, 120); }
+let currentAgent = localStorage.getItem('bds_agent_'+roomId) || null;
+
+function scrollDown(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight + 200; }, 100); }
+
 socket.emit('join-room', roomId, isHost);
+
 socket.on('joined', h=>{
   isHost=h;
   myRole = h? 'support' : 'client';
   document.getElementById('who').innerText = h? `You as ${currentAgent||'Support'}` : 'You (Client)';
   if(!h) document.getElementById('endBtn').style.display='none';
-  if(h){
-    const savedAgent = localStorage.getItem('bds_agent_'+roomId);
-    if(savedAgent){
-      currentAgent = savedAgent;
-      document.getElementById('who').innerText = `You as ${currentAgent}`;
-      socket.emit('set-agent', {roomId, agent: currentAgent});
-    }
-  }
 });
+
 function addMessageObj(m){
   const isMine = m.sender === myRole;
   const div=document.createElement('div');
   div.className='bubble '+(isMine?'me':'other');
-  div.dataset.time = m.time;
   let senderName = isMine? 'You' : (m.sender==='support'? (m.agent||'Support') : 'Client');
   let tickHtml = '';
   if(isMine){
@@ -68,21 +62,23 @@ function addMessageObj(m){
   chat.appendChild(div);
   scrollDown();
 }
+
 function renderAll(msgs){
   chat.innerHTML='';
   msgs.forEach(m=> addMessageObj(m));
 }
+
 document.getElementById('send').onclick=()=>{
  const t=input.value.trim(); if(!t) return;
  input.value='';
  const msgToSend = { text: t, sender: myRole, agent: currentAgent };
  socket.emit('send-message', roomId, msgToSend);
- scrollDown();
 };
+
 input.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('send').click();});
-input.addEventListener('focus', ()=>{ scrollDown(); setTimeout(scrollDown,300); });
-input.addEventListener('input',()=>{socket.emit('typing', roomId); scrollDown();});
+input.addEventListener('input',()=>{socket.emit('typing', roomId);});
 if(window.visualViewport){ window.visualViewport.addEventListener('resize', ()=>{ scrollDown(); }); }
+
 socket.on('load-history', (msgs, active, agent)=>{
   if(agent) currentAgent = agent;
   if(isHost && currentAgent) document.getElementById('who').innerText=`You as ${currentAgent}`;
@@ -92,43 +88,51 @@ socket.on('load-history', (msgs, active, agent)=>{
     div.className='bubble other';
     div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
     chat.appendChild(div);
-    input.disabled=true; input.placeholder='Chat closed';
+    input.disabled=true;
+    input.placeholder='Chat closed';
+  }
+  // ONLY send Keith intro if chat is empty
+  if(isHost &&!agent && msgs.length===0){
+    const savedAgent = localStorage.getItem('bds_agent_'+roomId);
+    if(savedAgent){
+      currentAgent = savedAgent;
+      document.getElementById('who').innerText=`You as ${currentAgent}`;
+      socket.emit('set-agent', {roomId, agent: currentAgent});
+    }
   }
   socket.emit('message-seen', {roomId, viewer: myRole});
 });
+
 socket.on('receive-msg', msg=>{
   addMessageObj(msg);
   socket.emit('message-seen', {roomId, viewer: myRole});
 });
+
 socket.on('messages-seen-update', (msgs)=>{
-  document.querySelectorAll('.bubble.me.tick').forEach(el=>{
-    el.innerText='✓✓ Seen';
-    el.className='tick seen';
-  });
+  // update all ticks to Seen
+  renderAll(msgs);
 });
+
 socket.on('show-typing',()=>{
  typing.style.display='block';
  typing.innerText=(isHost?'Client is typing...':'Support is typing...');
- scrollDown();
- clearTimeout(window.tt); window.tt=setTimeout(()=>typing.style.display='none',2500);
+ clearTimeout(window.tt); window.tt=setTimeout(()=>typing.style.display='none',2000);
 });
+
 socket.on('room-closed-msg', ()=>{
- const div=document.createElement('div');
- div.className='bubble other';
+ const div=document.createElement('div'); div.className='bubble other';
  div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
- chat.appendChild(div);
- input.disabled=true; input.placeholder='Chat closed';
+ chat.appendChild(div); input.disabled=true;
 });
+
 socket.on('room-closed', ()=>{
- const div=document.createElement('div');
- div.className='bubble other';
+ const div=document.createElement('div'); div.className='bubble other';
  div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
- chat.appendChild(div);
- input.disabled=true; input.placeholder='Chat closed';
- if(!isHost) setTimeout(()=>{ alert('Chat ended by support - under review'); },600);
+ chat.appendChild(div); input.disabled=true;
+ if(!isHost) setTimeout(()=>alert('Chat ended by support'),600);
 });
+
 document.getElementById('endBtn').onclick=()=>{if(confirm('End chat?'))socket.emit('close-room', roomId);};
-window.addEventListener('load', scrollDown);
 </script>
 </body>
 </html>

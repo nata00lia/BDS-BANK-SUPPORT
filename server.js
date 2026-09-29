@@ -10,16 +10,17 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const rooms = {}; // { roomId: { messages:[{text,sender,agent,seen,time}], active, created, agent } }
+const rooms = {}; // { roomId: { messages, active, created, agent, introSent } }
 
 app.get('/', (req,res)=> res.sendFile(path.join(__dirname,'public','host.html')));
 app.get('/chat/:roomId', (req,res)=> res.sendFile(path.join(__dirname,'public','chat.html')));
 app.get('/history', (req,res)=> res.json(rooms));
 
 io.on('connection', (socket)=>{
+
   socket.on('create-room', ()=>{
     const roomId = Math.random().toString(36).substring(2,9);
-    rooms[roomId] = { messages: [], active: true, created: new Date().toLocaleString(), agent: null };
+    rooms[roomId] = { messages: [], active: true, created: new Date().toLocaleString(), agent: null, introSent: false };
     const link = `https://bds-bank-support.onrender.com/chat/${roomId}`;
     socket.emit('room-created', { roomId, link });
     io.emit('rooms-update', rooms);
@@ -27,25 +28,26 @@ io.on('connection', (socket)=>{
 
   socket.on('join-room', (roomId, isHost)=>{
     if(!rooms[roomId]){
-      rooms[roomId] = { messages: [], active: false, created: 'old', agent: null };
+      rooms[roomId] = { messages: [], active: false, created: 'old', agent: null, introSent: false };
     }
     socket.join(roomId);
     socket.roomId = roomId;
     socket.isHost = isHost;
     socket.emit('joined', isHost);
     socket.emit('load-history', rooms[roomId].messages, rooms[roomId].active, rooms[roomId].agent);
-
-    if(rooms[roomId].active &&!isHost && rooms[roomId].messages.length===0 &&!rooms[roomId].agent){
-      const welcome = 'Hello! Welcome to BDS.BANK Support. How can we help you today?';
-      const msgObj = { text: welcome, sender: 'support', agent: 'Support', seen: false, time: Date.now() };
-      rooms[roomId].messages.push(msgObj);
-      setTimeout(()=> io.to(roomId).emit('receive-msg', msgObj), 800);
-    }
   });
 
   socket.on('set-agent', ({roomId, agent})=>{
     if(!rooms[roomId]) return;
+    // BLOCK SPAM ON REFRESH
+    if(rooms[roomId].introSent) return;
+    if(rooms[roomId].messages.some(m=> m.text.includes('from BDS BANK Support'))){
+      rooms[roomId].introSent = true;
+      rooms[roomId].agent = agent;
+      return;
+    }
     rooms[roomId].agent = agent;
+    rooms[roomId].introSent = true;
     const intro = `Hello, this is ${agent} from BDS BANK Support. What's your complaint and what can we do for you?`;
     const msgObj = { text: intro, sender: 'support', agent, seen: false, time: Date.now() };
     rooms[roomId].messages.push(msgObj);
@@ -76,9 +78,7 @@ io.on('connection', (socket)=>{
 
   socket.on('message-seen', ({roomId, viewer})=>{
     if(!rooms[roomId]) return;
-    rooms[roomId].messages.forEach(m=>{
-      if(m.sender!== viewer) m.seen = true;
-    });
+    rooms[roomId].messages.forEach(m=>{ if(m.sender!== viewer) m.seen = true; });
     io.to(roomId).emit('messages-seen-update', rooms[roomId].messages);
   });
 
