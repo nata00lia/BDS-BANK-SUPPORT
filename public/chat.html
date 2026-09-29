@@ -8,10 +8,13 @@
 body{font-family:sans-serif;background:#e5ddd5;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 .top{background:#075e54;color:white;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;position:fixed;top:0;left:0;right:0;height:56px;z-index:20}
 #chat{margin-top:56px;flex:1;overflow-y:auto;padding:10px 10px 90px 10px;background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');-webkit-overflow-scrolling:touch}
-.bubble{max-width:80%;padding:8px 12px;border-radius:8px;margin:6px 0;font-size:15px;line-height:1.4;box-shadow:0 1px .5px rgba(0,0,0,.13);word-wrap:break-word}
+.bubble{max-width:80%;padding:8px 12px;border-radius:8px;margin:6px 0;font-size:15px;line-height:1.4;box-shadow:0 1px.5px rgba(0,0,0,.13);word-wrap:break-word;position:relative}
 .me{background:#dcf8c6;margin-left:auto;border-top-right-radius:0}
 .other{background:white;margin-right:auto;border-top-left-radius:0}
 .small{font-size:11px;font-weight:bold;color:#075e54;margin-bottom:3px}
+.tick{font-size:11px;color:#53bdeb;float:right;margin-left:8px;margin-top:4px}
+.tick.seen{color:#0b8bff}
+.tick.delivered{color:#667781}
 #typing{position:fixed;bottom:75px;left:15px;font-size:12px;background:white;padding:6px 12px;border-radius:16px;display:none;color:#075e54;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:10}
 .bottom{position:fixed;bottom:0;left:0;right:0;background:#f0f0f0;padding:8px 10px;display:flex;gap:8px;align-items:center;z-index:30}
 .bottom input{flex:1;border:none;border-radius:22px;padding:12px 16px;font-size:16px;outline:none}
@@ -26,72 +29,104 @@ body{font-family:sans-serif;background:#e5ddd5;height:100dvh;display:flex;flex-d
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket=io();
-const roomId=location.pathname.split('/').pop();
+const roomId=location.pathname.split('/').pop().split('?')[0];
 const chat=document.getElementById('chat');
 const input=document.getElementById('input');
 const typing=document.getElementById('typing');
-let isHost=false;
-
-function scrollDown(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight + 150; }, 100); }
-
-socket.emit('join-room', roomId, location.search.includes('host'));
-
+let isHost=location.search.includes('host');
+let myRole = isHost? 'support' : 'client';
+let currentAgent = null;
+let allMessages = [];
+function scrollDown(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight + 150; }, 120); }
+socket.emit('join-room', roomId, isHost);
 socket.on('joined', h=>{
   isHost=h;
-  document.getElementById('who').innerText=h?'You (Support)':'You (Client)';
+  myRole = h? 'support' : 'client';
+  document.getElementById('who').innerText = h? `You as ${currentAgent||'Support'}` : 'You (Client)';
   if(!h) document.getElementById('endBtn').style.display='none';
+  if(h){
+    const savedAgent = localStorage.getItem('bds_agent_'+roomId);
+    if(savedAgent){
+      currentAgent = savedAgent;
+      document.getElementById('who').innerText = `You as ${currentAgent}`;
+      socket.emit('set-agent', {roomId, agent: currentAgent});
+    }
+  }
 });
-
-function add(text,me){
- const div=document.createElement('div');
- div.className='bubble '+(me?'me':'other');
- const name=me?'You':(isHost?'Client':'Support');
- div.innerHTML=`<div class="small">${name}</div>${text}`;
- chat.appendChild(div); scrollDown();
+function addMessageObj(m){
+  const isMine = m.sender === myRole;
+  const div=document.createElement('div');
+  div.className='bubble '+(isMine?'me':'other');
+  div.dataset.time = m.time;
+  let senderName = isMine? 'You' : (m.sender==='support'? (m.agent||'Support') : 'Client');
+  let tickHtml = '';
+  if(isMine){
+    if(m.seen) tickHtml = `<span class="tick seen">✓✓ Seen</span>`;
+    else tickHtml = `<span class="tick delivered">✓✓</span>`;
+  }
+  div.innerHTML=`<div class="small">${senderName}</div>${m.text}${tickHtml}<div style="clear:both"></div>`;
+  chat.appendChild(div);
+  scrollDown();
 }
-
+function renderAll(msgs){
+  chat.innerHTML='';
+  msgs.forEach(m=> addMessageObj(m));
+}
 document.getElementById('send').onclick=()=>{
- const t=input.value.trim(); if(!t)return;
- add(t,true); socket.emit('send-message', roomId, t); input.value=''; scrollDown();
+ const t=input.value.trim(); if(!t) return;
+ input.value='';
+ const msgToSend = { text: t, sender: myRole, agent: currentAgent };
+ socket.emit('send-message', roomId, msgToSend);
+ scrollDown();
 };
 input.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('send').click();});
 input.addEventListener('focus', ()=>{ scrollDown(); setTimeout(scrollDown,300); });
 input.addEventListener('input',()=>{socket.emit('typing', roomId); scrollDown();});
 if(window.visualViewport){ window.visualViewport.addEventListener('resize', ()=>{ scrollDown(); }); }
-
-// HISTORY + CLOSED LOGIC
-socket.on('load-history', (msgs, active)=>{
- msgs.forEach(m=>{ add(m.text,false); });
- if(!active){
-   add('This chat is no more available, it is under review.', false);
-   input.disabled=true;
-   input.placeholder='Chat closed';
- }
+socket.on('load-history', (msgs, active, agent)=>{
+  if(agent) currentAgent = agent;
+  if(isHost && currentAgent) document.getElementById('who').innerText=`You as ${currentAgent}`;
+  renderAll(msgs);
+  if(!active){
+    const div=document.createElement('div');
+    div.className='bubble other';
+    div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
+    chat.appendChild(div);
+    input.disabled=true; input.placeholder='Chat closed';
+  }
+  socket.emit('message-seen', {roomId, viewer: myRole});
 });
-
-socket.on('receive-msg', msg=>{add(msg,false);});
-
+socket.on('receive-msg', msg=>{
+  addMessageObj(msg);
+  socket.emit('message-seen', {roomId, viewer: myRole});
+});
+socket.on('messages-seen-update', (msgs)=>{
+  document.querySelectorAll('.bubble.me.tick').forEach(el=>{
+    el.innerText='✓✓ Seen';
+    el.className='tick seen';
+  });
+});
 socket.on('show-typing',()=>{
- typing.style.display='block'; 
+ typing.style.display='block';
  typing.innerText=(isHost?'Client is typing...':'Support is typing...');
  scrollDown();
  clearTimeout(window.tt); window.tt=setTimeout(()=>typing.style.display='none',2500);
 });
-
 socket.on('room-closed-msg', ()=>{
- add('This chat is no more available, it is under review.', false);
- input.disabled=true;
- input.placeholder='Chat closed';
+ const div=document.createElement('div');
+ div.className='bubble other';
+ div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
+ chat.appendChild(div);
+ input.disabled=true; input.placeholder='Chat closed';
 });
-
 socket.on('room-closed', ()=>{
- add('This chat is no more available, it is under review.', false);
- input.disabled=true;
- input.placeholder='Chat closed';
+ const div=document.createElement('div');
+ div.className='bubble other';
+ div.innerHTML='<div class="small">System</div>This chat is no more available, it is under review.';
+ chat.appendChild(div);
+ input.disabled=true; input.placeholder='Chat closed';
  if(!isHost) setTimeout(()=>{ alert('Chat ended by support - under review'); },600);
 });
-
-socket.on('auto-reply', msg=>{add(msg,false);});
 document.getElementById('endBtn').onclick=()=>{if(confirm('End chat?'))socket.emit('close-room', roomId);};
 window.addEventListener('load', scrollDown);
 </script>
